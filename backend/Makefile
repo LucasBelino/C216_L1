@@ -14,7 +14,7 @@ help:
 	@echo "  make clean    - remove arquivos temporários"
 
 install:
-	poetry install
+	cd backend && poetry install
 
 test:
 	$(PYTEST)
