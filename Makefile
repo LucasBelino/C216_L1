@@ -1,8 +1,12 @@
+.DEFAULT_GOAL := help
 .PHONY: help install test lint format run clean
 
-PYTEST := poetry run pytest
-UVICORN := poetry run uvicorn
-RUFF := poetry run ruff
+BACKEND_DIR := backend
+POETRY := poetry -C $(BACKEND_DIR)
+
+PYTEST := $(POETRY) run pytest
+UVICORN := $(POETRY) run uvicorn
+RUFF := $(POETRY) run ruff
 
 help:
 	@echo "Comandos disponíveis:"
@@ -14,7 +18,7 @@ help:
 	@echo "  make clean    - remove arquivos temporários"
 
 install:
-	cd backend && poetry install
+	$(POETRY) install
 
 test:
 	$(PYTEST)
@@ -27,3 +31,8 @@ format:
 
 run:
 	$(UVICORN) app.main:app --reload
+
+clean: 
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name '*.pyc' -delete
+	rm -rf .pytest_cache .ruff_cache
