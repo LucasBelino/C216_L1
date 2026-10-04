@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 
-app = FastAPI()
+from app.api.routes.items import router as items_router
+from app.api.routes.root import router as root_router
 
+app = FastAPI(title="C216 - Laboratório de Sistemas Distribuídos")
 
-@app.get("/")
-def root():
-    return {"message": "Laboratório distribuído funcionando!"}
+app.include_router(root_router)
+app.include_router(items_router)
