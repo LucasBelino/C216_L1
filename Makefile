@@ -1,5 +1,6 @@
 .DEFAULT_GOAL := help
-.PHONY: help install test test-v lint format format-check ci run clean \
+.PHONY: help install test test-v test-unit test-integration lint format \
+        format-check ci run clean \
         up up-build build down logs logs-api ps shell
 
 BACKEND_DIR := backend
@@ -19,6 +20,8 @@ help:
 	@echo "  Qualidade e testes:"
 	@echo "    make test          - executa os testes"
 	@echo "    make test-v        - executa os testes com saída detalhada"
+	@echo "    make test-unit     - executa apenas os testes unitários"
+	@echo "    make test-integration - executa apenas os testes de integração"
 	@echo "    make lint          - verifica o código"
 	@echo "    make format        - formata o código"
 	@echo "    make format-check  - confere a formatação sem alterar arquivos"
@@ -42,6 +45,12 @@ test:
 
 test-v:
 	cd $(BACKEND_DIR) && poetry run pytest -v
+
+test-unit:
+	cd $(BACKEND_DIR) && poetry run pytest tests/unit
+
+test-integration:
+	cd $(BACKEND_DIR) && poetry run pytest tests/integration
 
 lint:
 	$(RUFF) check .
