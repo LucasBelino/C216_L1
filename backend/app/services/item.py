@@ -1,4 +1,6 @@
-from app.schemas.item import ItemCreate, ItemPatch, ItemRead, ItemUpdate
+from app.models.item import Item
+from app.repositories.item import ItemRepository
+from app.schemas.item import ItemCreate, ItemPatch, ItemUpdate
 
 
 class ItemNotFoundError(Exception):
@@ -8,47 +10,35 @@ class ItemNotFoundError(Exception):
 
 
 class ItemService:
-    """Regras de negócio dos itens, com armazenamento em memória."""
+    """Regras de negócio dos itens."""
 
-    def __init__(self) -> None:
-        self._items: dict[int, ItemRead] = {}
-        self._next_id = 1
+    def __init__(self, repository: ItemRepository) -> None:
+        self.repository = repository
 
-    def list_items(self, limit: int = 10, offset: int = 0) -> list[ItemRead]:
-        items = list(self._items.values())
-        return items[offset : offset + limit]
+    def list_items(self, limit: int = 10, offset: int = 0) -> list[Item]:
+        return self.repository.get_all(limit=limit, offset=offset)
 
-    def get_item(self, item_id: int) -> ItemRead:
-        if item_id not in self._items:
+    def get_item(self, item_id: int) -> Item:
+        item = self.repository.get_by_id(item_id)
+        if item is None:
             raise ItemNotFoundError(item_id)
-        return self._items[item_id]
-
-    def create_item(self, data: ItemCreate) -> ItemRead:
-        item = ItemRead(id=self._next_id, **data.model_dump())
-        self._items[item.id] = item
-        self._next_id += 1
         return item
 
-    def replace_item(self, item_id: int, data: ItemUpdate) -> ItemRead:
-        self.get_item(item_id)
-        item = ItemRead(id=item_id, **data.model_dump())
-        self._items[item_id] = item
-        return item
+    def create_item(self, data: ItemCreate) -> Item:
+        return self.repository.create(Item(**data.model_dump()))
 
-    def update_item(self, item_id: int, data: ItemPatch) -> ItemRead:
-        current = self.get_item(item_id)
-        changes = data.model_dump(exclude_unset=True)
-        item = current.model_copy(update=changes)
-        self._items[item_id] = item
-        return item
+    def replace_item(self, item_id: int, data: ItemUpdate) -> Item:
+        item = self.get_item(item_id)
+        for field, value in data.model_dump().items():
+            setattr(item, field, value)
+        return self.repository.update(item)
+
+    def update_item(self, item_id: int, data: ItemPatch) -> Item:
+        item = self.get_item(item_id)
+        for field, value in data.model_dump(exclude_unset=True).items():
+            setattr(item, field, value)
+        return self.repository.update(item)
 
     def delete_item(self, item_id: int) -> None:
-        self.get_item(item_id)
-        del self._items[item_id]
-
-
-_item_service = ItemService()
-
-
-def get_item_service() -> ItemService:
-    return _item_service
+        item = self.get_item(item_id)
+        self.repository.delete(item)

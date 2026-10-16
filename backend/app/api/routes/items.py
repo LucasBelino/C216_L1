@@ -1,11 +1,19 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
+from app.database.session import get_db
+from app.repositories.item import ItemRepository
 from app.schemas.item import ItemCreate, ItemPatch, ItemRead, ItemUpdate
-from app.services.item import ItemNotFoundError, ItemService, get_item_service
+from app.services.item import ItemNotFoundError, ItemService
 
 router = APIRouter(prefix="/items", tags=["Items"])
+
+
+def get_item_service(db: Annotated[Session, Depends(get_db)]) -> ItemService:
+    return ItemService(ItemRepository(db))
+
 
 ItemServiceDep = Annotated[ItemService, Depends(get_item_service)]
 
