@@ -1,13 +1,18 @@
 .DEFAULT_GOAL := help
 .PHONY: help install test test-v test-unit test-integration lint format \
         format-check ci run clean \
+        db-upgrade db-migration db-current \
         up up-build build down logs logs-api ps shell
+
+-include .env
 
 BACKEND_DIR := backend
 POETRY := poetry -C $(BACKEND_DIR)
 
-UVICORN := $(POETRY) run uvicorn
 RUFF := $(POETRY) run ruff
+
+DATABASE_URL_LOCAL := $(subst @db:,@localhost:,$(DATABASE_URL))
+ALEMBIC := cd $(BACKEND_DIR) && DATABASE_URL="$(DATABASE_URL_LOCAL)" poetry run alembic
 
 help:
 	@echo "Comandos disponíveis:"
@@ -26,6 +31,11 @@ help:
 	@echo "    make format        - formata o código"
 	@echo "    make format-check  - confere a formatação sem alterar arquivos"
 	@echo "    make ci            - roda formatação, lint e testes (igual ao CI)"
+	@echo ""
+	@echo "  Banco de dados:"
+	@echo "    make db-upgrade    - aplica as migrations pendentes"
+	@echo "    make db-migration msg=\"descricao\" - gera uma migration pelos modelos"
+	@echo "    make db-current    - mostra a versão atual do banco"
 	@echo ""
 	@echo "  Docker:"
 	@echo "    make up            - sobe os serviços"
@@ -64,7 +74,16 @@ format-check:
 ci: format-check lint test
 
 run:
-	$(UVICORN) app.main:app --reload
+	cd $(BACKEND_DIR) && DATABASE_URL="$(DATABASE_URL_LOCAL)" poetry run uvicorn app.main:app --reload
+
+db-upgrade:
+	$(ALEMBIC) upgrade head
+
+db-migration:
+	$(ALEMBIC) revision --autogenerate -m "$(msg)"
+
+db-current:
+	$(ALEMBIC) current
 
 clean: 
 	find . -type d -name __pycache__ -exec rm -rf {} +
