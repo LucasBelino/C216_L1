@@ -35,3 +35,8 @@ def test_item_patch_registra_apenas_campos_enviados():
     patch = ItemPatch(name="Novo nome")
 
     assert patch.model_dump(exclude_unset=True) == {"name": "Novo nome"}
+
+
+def test_item_patch_rejeita_name_nulo():
+    with pytest.raises(ValidationError):
+        ItemPatch(name=None)

@@ -1,5 +1,10 @@
 import pytest
 from fastapi import status
+from sqlalchemy.orm import Session
+
+from app.models.item import Item
+
+ID_INEXISTENTE = 999_999
 
 
 @pytest.fixture
@@ -22,7 +27,20 @@ def test_criar_item(client):
     response = client.post("/items", json={"name": "Mouse"})
 
     assert response.status_code == status.HTTP_201_CREATED
-    assert response.json() == {"id": 1, "name": "Mouse", "description": None}
+    corpo = response.json()
+    assert isinstance(corpo["id"], int)
+    assert corpo["name"] == "Mouse"
+    assert corpo["description"] is None
+
+
+def test_item_criado_fica_gravado_no_banco(client, engine):
+    item_id = client.post("/items", json={"name": "Notebook"}).json()["id"]
+
+    with Session(engine) as outra_sessao:
+        item = outra_sessao.get(Item, item_id)
+
+    assert item is not None
+    assert item.name == "Notebook"
 
 
 @pytest.mark.parametrize(
@@ -82,6 +100,12 @@ def test_atualizar_item_parcialmente(client, item_criado):
     assert response.json()["description"] == "Mecânico"
 
 
+def test_atualizar_item_com_name_nulo_retorna_422(client, item_criado):
+    response = client.patch(f"/items/{item_criado['id']}", json={"name": None})
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+
 def test_remover_item(client, item_criado):
     response = client.delete(f"/items/{item_criado['id']}")
 
@@ -99,7 +123,7 @@ def test_remover_item(client, item_criado):
     ],
 )
 def test_operacoes_em_item_inexistente_retornam_404(client, metodo, corpo):
-    response = client.request(metodo.upper(), "/items/99", json=corpo)
+    response = client.request(metodo.upper(), f"/items/{ID_INEXISTENTE}", json=corpo)
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json() == {"detail": "Item 99 não encontrado"}
+    assert response.json() == {"detail": f"Item {ID_INEXISTENTE} não encontrado"}
