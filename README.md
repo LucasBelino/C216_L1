@@ -1,9 +1,8 @@
 # C216_L1 — Laboratório de Sistemas Distribuídos
 
-Laboratório contínuo da disciplina C216. O backend é uma API FastAPI
-organizada em camadas, empacotada em container, acompanhada de um PostgreSQL
-orquestrado por Docker Compose e de uma esteira de integração contínua no
-GitHub Actions.
+Laboratório contínuo da disciplina C216. O backend é uma API FastAPI organizada
+em camadas, que persiste dados no PostgreSQL por meio do SQLAlchemy, com a
+estrutura do banco versionada pelo Alembic.
 
 ## Estrutura
 
@@ -13,122 +12,95 @@ GitHub Actions.
 ├── backend/
 │   ├── app/
 │   │   ├── main.py                    # inicialização da aplicação
-│   │   ├── api/routes/                # endpoints (camada HTTP)
-│   │   ├── schemas/                   # modelos Pydantic
-│   │   └── services/                  # regras de negócio
+│   │   ├── api/routes/                # endpoints (HTTP)
+│   │   ├── schemas/                   # entrada e saída da API (Pydantic)
+│   │   ├── services/                  # regras de negócio
+│   │   ├── repositories/              # acesso aos dados
+│   │   ├── models/                    # modelos SQLAlchemy
+│   │   ├── database/                  # conexão e sessão
+│   │   └── core/                      # configuração
+│   ├── alembic/versions/              # migrations
 │   ├── tests/
-│   │   ├── unit/                      # testes sem HTTP
-│   │   └── integration/               # testes via TestClient
-│   ├── Dockerfile
+│   │   ├── unit/
+│   │   └── integration/
+│   ├── alembic.ini
 │   └── pyproject.toml
-├── compose.yaml                       # api + banco de dados
-├── Makefile                           # interface de operação
+├── compose.yaml                       # api + PostgreSQL
+├── Makefile
 └── .env.example
 ```
 
-Cada requisição segue o fluxo `rota → service → armazenamento`. As rotas só
-lidam com HTTP (parâmetros, status e erros); as regras ficam no service, que
-não conhece nada de HTTP e por isso pode ser testado isoladamente.
+Fluxo de uma requisição: `Route → Service → Repository → SQLAlchemy → PostgreSQL`.
 
-## Requisitos
-
-- Python 3.13 ou superior
-- Poetry
-- Docker e Docker Compose
-
-## Instalação
-
-```bash
-make install
-```
-
-## Executando a aplicação
-
-Localmente, com recarregamento automático:
-
-```bash
-make run
-```
-
-Em containers, junto do banco de dados:
+## Configuração
 
 ```bash
 cp .env.example .env
-make up-build
+make install
 ```
 
-A aplicação responde em `http://localhost:8000` e a documentação interativa
-fica em `http://localhost:8000/docs`.
+A `DATABASE_URL` aponta para o host `db`, nome do serviço no Compose. Os
+comandos do Makefile que rodam fora do Docker trocam `db` por `localhost`.
+
+## Executando
+
+```bash
+make up-build
+make db-upgrade
+```
+
+A aplicação responde em `http://localhost:8000` e a documentação em
+`http://localhost:8000/docs`.
 
 ## API
 
-| Método | Caminho | Descrição | Sucesso |
-| --- | --- | --- | --- |
-| `GET` | `/` | verificação de funcionamento | `200` |
-| `GET` | `/items` | lista itens — query `limit` (1–100) e `offset` (≥ 0) | `200` |
-| `GET` | `/items/{item_id}` | busca um item | `200` |
-| `POST` | `/items` | cria um item | `201` |
-| `PUT` | `/items/{item_id}` | substitui um item inteiro | `200` |
-| `PATCH` | `/items/{item_id}` | atualiza apenas os campos enviados | `200` |
-| `DELETE` | `/items/{item_id}` | remove um item | `204` |
+| Método | Caminho | Descrição |
+| --- | --- | --- |
+| `GET` | `/items` | lista itens (query `limit` e `offset`) |
+| `GET` | `/items/{item_id}` | busca um item |
+| `POST` | `/items` | cria um item |
+| `PUT` | `/items/{item_id}` | substitui um item |
+| `PATCH` | `/items/{item_id}` | atualiza parte de um item |
+| `DELETE` | `/items/{item_id}` | remove um item |
 
-Item inexistente devolve `404`; dados ou parâmetros inválidos devolvem `422`.
+## Migrations
 
-Corpo aceito em `POST` e `PUT`:
+| Comando | Ação |
+| --- | --- |
+| `make db-upgrade` | aplica as migrations |
+| `make db-migration msg="descricao"` | gera uma migration a partir dos modelos |
+| `make db-current` | mostra a versão atual do banco |
 
-```json
-{
-  "name": "Teclado",
-  "description": "Mecânico"
-}
+Depois de gerar uma migration, revise o arquivo em `backend/alembic/versions/`
+antes de aplicar.
+
+## Validando a persistência
+
+1. `make up-build` e `make db-upgrade`
+2. Criar um item em `/docs` (`POST /items`)
+3. `docker compose restart api`
+4. Listar de novo (`GET /items`) — o item continua lá
+5. Conferir no banco:
+
+```bash
+docker compose exec db psql -U app -d app
 ```
 
-`name` é obrigatório (1 a 100 caracteres) e `description` é opcional (até 500).
-No `PATCH`, ambos são opcionais.
-
-Os itens ficam em memória nesta etapa; a persistência no PostgreSQL entra na
-próxima prática.
+```sql
+SELECT * FROM items;
+```
 
 ## Testes
-
-Os testes ficam em `backend/tests`, separados em dois níveis:
-
-- **Unitários** (`tests/unit`) — testam o service e os modelos Pydantic
-  diretamente, sem HTTP. São rápidos e apontam exatamente qual regra quebrou.
-- **Integração** (`tests/integration`) — exercitam todos os endpoints pelo
-  `TestClient`, passando por rota, validação, service e resposta.
 
 | Comando | Executa |
 | --- | --- |
 | `make test` | toda a suíte |
-| `make test-unit` | apenas os unitários |
-| `make test-integration` | apenas os de integração |
-| `make test-v` | toda a suíte, com saída detalhada |
-| `make ci` | formatação, lint e testes — o mesmo que o CI |
+| `make test-unit` | testes unitários |
+| `make test-integration` | testes de integração |
+| `make lint` | verificação do código |
 
-Para rodar um teste específico, use o Pytest direto:
-
-```bash
-cd backend
-poetry run pytest tests/unit/test_item_service.py
-poetry run pytest -k "404"
-```
-
-Cada teste recebe, pela fixture `item_service`, um service novo e vazio. Nos
-testes de integração, esse service substitui o da aplicação por
-`dependency_overrides`, então nenhum teste enxerga itens criados por outro.
-
-## Integração contínua
-
-O workflow `.github/workflows/ci-backend.yml` roda em `push` e em
-`pull_request`, sempre que algo dentro de `backend/` ou o próprio workflow
-mudar. Ele tem dois jobs:
-
-- **Formatacao e lint** — `ruff format --check` e `ruff check`
-- **Pytest** — testes unitários e de integração, em passos separados
-
-Os dois usam Python 3.13 e instalam as dependências com Poetry. A branch
-`aulas` exige os dois jobs aprovados e uma revisão antes do merge.
+Os testes de integração usam um banco SQLite em memória, então rodam sem
+Docker. As tabelas são esvaziadas ao final de cada teste.
 
 ## Comandos disponíveis
 
