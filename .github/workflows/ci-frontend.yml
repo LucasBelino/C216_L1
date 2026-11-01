@@ -1,0 +1,81 @@
+name: CI - Frontend
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/ci-frontend.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - ".github/workflows/ci-frontend.yml"
+
+jobs:
+  qualidade:
+    name: Biome (lint e formatacao)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar o Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar as dependencias
+        run: npm ci
+
+      - name: Conferir o lint
+        run: npm run lint
+
+      - name: Conferir a formatacao
+        run: npm run format:check
+
+  testes:
+    name: Vitest, Build e Playwright
+    needs: qualidade
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar o Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar as dependencias
+        run: npm ci
+
+      - name: Executar os testes unitarios e de integracao
+        run: npm run test
+
+      - name: Gerar o build
+        run: npm run build
+
+      - name: Instalar o navegador do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Executar os testes E2E
+        run: npm run test:e2e
+
+      - name: Enviar o relatorio do Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
