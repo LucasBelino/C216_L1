@@ -2,7 +2,9 @@
 .PHONY: help install test test-v test-unit test-integration lint format \
         format-check ci run clean \
         db-upgrade db-migration db-current \
-        up up-build build down logs logs-api ps shell
+        up up-build build down logs logs-api ps shell \
+        frontend-install frontend-dev frontend-lint frontend-format \
+        frontend-check frontend-test frontend-test-e2e frontend-build check-all
 
 -include .env
 
@@ -13,6 +15,8 @@ RUFF := $(POETRY) run ruff
 
 DATABASE_URL_LOCAL := $(subst @db:,@localhost:,$(DATABASE_URL))
 ALEMBIC := cd $(BACKEND_DIR) && DATABASE_URL="$(DATABASE_URL_LOCAL)" poetry run alembic
+
+FRONTEND := npm --prefix frontend
 
 help:
 	@echo "Comandos disponíveis:"
@@ -36,6 +40,17 @@ help:
 	@echo "    make db-upgrade    - aplica as migrations pendentes"
 	@echo "    make db-migration msg=\"descricao\" - gera uma migration pelos modelos"
 	@echo "    make db-current    - mostra a versão atual do banco"
+	@echo ""
+	@echo "  Frontend:"
+	@echo "    make frontend-install  - instala as dependências (npm ci)"
+	@echo "    make frontend-dev      - inicia o servidor de desenvolvimento (Vite)"
+	@echo "    make frontend-lint     - verifica o código (Biome)"
+	@echo "    make frontend-format   - formata o código (Biome)"
+	@echo "    make frontend-check    - lint e formatação sem alterar arquivos"
+	@echo "    make frontend-test     - executa os testes unitários e de integração (Vitest)"
+	@echo "    make frontend-test-e2e - executa os testes E2E (Playwright)"
+	@echo "    make frontend-build    - gera o build de produção"
+	@echo "    make check-all         - valida backend e frontend"
 	@echo ""
 	@echo "  Docker:"
 	@echo "    make up            - sobe os serviços"
@@ -113,3 +128,29 @@ ps:
 
 shell:
 	docker compose exec api sh
+
+frontend-install:
+	$(FRONTEND) ci
+
+frontend-dev:
+	$(FRONTEND) run dev
+
+frontend-lint:
+	$(FRONTEND) run lint
+
+frontend-format:
+	$(FRONTEND) run format
+
+frontend-check:
+	$(FRONTEND) run check
+
+frontend-test:
+	$(FRONTEND) run test
+
+frontend-test-e2e:
+	$(FRONTEND) run test:e2e
+
+frontend-build:
+	$(FRONTEND) run build
+
+check-all: ci frontend-check frontend-test frontend-build frontend-test-e2e
