@@ -9,6 +9,12 @@ class ItemNotFoundError(Exception):
         self.item_id = item_id
 
 
+class ItemAlreadyExistsError(Exception):
+    def __init__(self, name: str) -> None:
+        super().__init__("Já existe um item com esse nome")
+        self.name = name
+
+
 class ItemService:
     """Regras de negócio dos itens."""
 
@@ -25,20 +31,30 @@ class ItemService:
         return item
 
     def create_item(self, data: ItemCreate) -> Item:
+        self._ensure_unique_name(data.name)
         return self.repository.create(Item(**data.model_dump()))
 
     def replace_item(self, item_id: int, data: ItemUpdate) -> Item:
         item = self.get_item(item_id)
+        self._ensure_unique_name(data.name, item_id)
         for field, value in data.model_dump().items():
             setattr(item, field, value)
         return self.repository.update(item)
 
     def update_item(self, item_id: int, data: ItemPatch) -> Item:
         item = self.get_item(item_id)
-        for field, value in data.model_dump(exclude_unset=True).items():
+        changes = data.model_dump(exclude_unset=True)
+        if "name" in changes:
+            self._ensure_unique_name(changes["name"], item_id)
+        for field, value in changes.items():
             setattr(item, field, value)
         return self.repository.update(item)
 
     def delete_item(self, item_id: int) -> None:
         item = self.get_item(item_id)
         self.repository.delete(item)
+
+    def _ensure_unique_name(self, name: str, item_id: int | None = None) -> None:
+        existing = self.repository.get_by_name(name)
+        if existing is not None and existing.id != item_id:
+            raise ItemAlreadyExistsError(name)

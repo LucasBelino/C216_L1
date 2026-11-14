@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories.item import ItemRepository
 from app.schemas.item import ItemCreate, ItemPatch, ItemUpdate
-from app.services.item import ItemNotFoundError, ItemService
+from app.services.item import ItemAlreadyExistsError, ItemNotFoundError, ItemService
 
 ID_INEXISTENTE = 999_999
 
@@ -101,3 +101,25 @@ def test_remover_item(service_com_itens):
 def test_operacoes_em_item_inexistente_levantam_erro(item_service, operacao):
     with pytest.raises(ItemNotFoundError):
         operacao(item_service)
+
+
+def test_criar_item_com_nome_repetido_levanta_erro(item_service):
+    item_service.create_item(ItemCreate(name="Teclado"))
+
+    with pytest.raises(ItemAlreadyExistsError):
+        item_service.create_item(ItemCreate(name="Teclado"))
+
+
+def test_editar_item_com_nome_de_outro_item_levanta_erro(service_com_itens):
+    mouse = service_com_itens.list_items()[1]
+
+    with pytest.raises(ItemAlreadyExistsError):
+        service_com_itens.replace_item(mouse.id, ItemUpdate(name="Teclado"))
+
+
+def test_editar_item_mantendo_o_proprio_nome(item_service):
+    criado = item_service.create_item(ItemCreate(name="Teclado"))
+
+    item = item_service.update_item(criado.id, ItemPatch(name="Teclado"))
+
+    assert item.name == "Teclado"

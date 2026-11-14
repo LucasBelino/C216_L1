@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.repositories.item import ItemRepository
 from app.schemas.item import ItemCreate, ItemPatch, ItemRead, ItemUpdate
-from app.services.item import ItemNotFoundError, ItemService
+from app.services.item import ItemAlreadyExistsError, ItemNotFoundError, ItemService
 
 router = APIRouter(prefix="/items", tags=["Items"])
 
@@ -37,7 +37,10 @@ def get_item(item_id: int, service: ItemServiceDep):
 
 @router.post("", response_model=ItemRead, status_code=status.HTTP_201_CREATED)
 def create_item(data: ItemCreate, service: ItemServiceDep):
-    return service.create_item(data)
+    try:
+        return service.create_item(data)
+    except ItemAlreadyExistsError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
 
 
 @router.put("/{item_id}", response_model=ItemRead)
@@ -46,6 +49,8 @@ def replace_item(item_id: int, data: ItemUpdate, service: ItemServiceDep):
         return service.replace_item(item_id, data)
     except ItemNotFoundError as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
+    except ItemAlreadyExistsError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
 
 
 @router.patch("/{item_id}", response_model=ItemRead)
@@ -54,6 +59,8 @@ def update_item(item_id: int, data: ItemPatch, service: ItemServiceDep):
         return service.update_item(item_id, data)
     except ItemNotFoundError as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
+    except ItemAlreadyExistsError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

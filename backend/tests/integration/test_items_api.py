@@ -127,3 +127,22 @@ def test_operacoes_em_item_inexistente_retornam_404(client, metodo, corpo):
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.json() == {"detail": f"Item {ID_INEXISTENTE} não encontrado"}
+
+
+def test_criar_item_com_nome_repetido_retorna_409(client, item_criado):
+    response = client.post("/items", json={"name": item_criado["name"]})
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"detail": "Já existe um item com esse nome"}
+
+
+@pytest.mark.parametrize("metodo", ["put", "patch"])
+def test_editar_item_com_nome_de_outro_item_retorna_409(client, item_criado, metodo):
+    outro_id = client.post("/items", json={"name": "Mouse"}).json()["id"]
+
+    response = client.request(
+        metodo.upper(), f"/items/{outro_id}", json={"name": item_criado["name"]}
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"detail": "Já existe um item com esse nome"}
