@@ -1,30 +1,50 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ItemForm } from "./components/ItemForm";
 import { ItemList } from "./components/ItemList";
+import {
+  createItem,
+  deleteItem,
+  listItems,
+  replaceItem,
+} from "./services/items";
 
 export default function App() {
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [removeError, setRemoveError] = useState("");
   const [editingId, setEditingId] = useState(null);
 
   const editingItem = items.find((item) => item.id === editingId);
 
-  function addItem({ name, description }) {
-    setItems((current) => [
-      ...current,
-      { id: crypto.randomUUID(), name, description },
-    ]);
+  useEffect(() => {
+    listItems()
+      .then(setItems)
+      .catch((error) => setLoadError(error.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function addItem(values) {
+    const created = await createItem(values);
+    setItems((current) => [...current, created]);
   }
 
-  function updateItem({ name, description }) {
+  async function saveItem(values) {
+    const updated = await replaceItem(editingId, values);
     setItems((current) =>
-      current.map((item) =>
-        item.id === editingId ? { ...item, name, description } : item,
-      ),
+      current.map((item) => (item.id === updated.id ? updated : item)),
     );
     setEditingId(null);
   }
 
-  function removeItem(itemToRemove) {
+  async function removeItem(itemToRemove) {
+    setRemoveError("");
+    try {
+      await deleteItem(itemToRemove.id);
+    } catch (error) {
+      setRemoveError(error.message);
+      return;
+    }
     setItems((current) =>
       current.filter((item) => item.id !== itemToRemove.id),
     );
@@ -43,9 +63,12 @@ export default function App() {
         {editingItem ? (
           <ItemForm
             key={editingItem.id}
-            initialValues={editingItem}
+            initialValues={{
+              name: editingItem.name,
+              description: editingItem.description ?? "",
+            }}
             submitLabel="Salvar"
-            onSubmit={updateItem}
+            onSubmit={saveItem}
             onCancel={() => setEditingId(null)}
           />
         ) : (
@@ -56,11 +79,24 @@ export default function App() {
         <h2 id="items-heading" className="text-xl font-semibold">
           Itens cadastrados
         </h2>
-        <ItemList
-          items={items}
-          onEdit={(item) => setEditingId(item.id)}
-          onRemove={removeItem}
-        />
+        {removeError && (
+          <p role="alert" className="text-sm text-red-700">
+            {removeError}
+          </p>
+        )}
+        {loading && <p className="text-slate-600">Carregando itens...</p>}
+        {!loading && loadError && (
+          <p role="alert" className="text-red-700">
+            {loadError}
+          </p>
+        )}
+        {!loading && !loadError && (
+          <ItemList
+            items={items}
+            onEdit={(item) => setEditingId(item.id)}
+            onRemove={removeItem}
+          />
+        )}
       </section>
     </main>
   );

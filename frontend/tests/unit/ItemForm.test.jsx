@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ItemForm } from "../../src/components/ItemForm";
@@ -69,5 +69,42 @@ describe("ItemForm", () => {
     expect(
       screen.queryByRole("button", { name: "Cancelar" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("mostra o erro e mantém os valores quando o envio falha", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi
+      .fn()
+      .mockRejectedValue(new Error("Já existe um item com esse nome"));
+    render(<ItemForm onSubmit={onSubmit} />);
+
+    await user.type(screen.getByLabelText("Nome"), "Notebook");
+    await user.click(screen.getByRole("button", { name: "Adicionar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Já existe um item com esse nome",
+    );
+    expect(screen.getByLabelText("Nome")).toHaveValue("Notebook");
+  });
+
+  it("desabilita o botão enquanto salva", async () => {
+    const user = userEvent.setup();
+    let finish;
+    const onSubmit = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(<ItemForm onSubmit={onSubmit} />);
+
+    await user.type(screen.getByLabelText("Nome"), "Notebook");
+    await user.click(screen.getByRole("button", { name: "Adicionar" }));
+
+    expect(screen.getByRole("button", { name: "Adicionar" })).toBeDisabled();
+    finish();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Adicionar" })).toBeEnabled(),
+    );
   });
 });

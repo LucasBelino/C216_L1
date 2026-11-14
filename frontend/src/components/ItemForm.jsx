@@ -12,16 +12,26 @@ export function ItemForm({
   const [name, setName] = useState(initialValues.name);
   const [description, setDescription] = useState(initialValues.description);
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const result = validateItem({ name, description });
     setErrors(result.errors);
+    setSubmitError("");
     if (Object.keys(result.errors).length > 0) return;
 
-    onSubmit(result.values);
-    setName("");
-    setDescription("");
+    setSaving(true);
+    try {
+      await onSubmit(result.values);
+      setName("");
+      setDescription("");
+    } catch (error) {
+      setSubmitError(error.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -60,10 +70,16 @@ export function ItemForm({
           className="w-full rounded border border-slate-300 p-2"
         />
       </div>
+      {submitError && (
+        <p role="alert" className="text-sm text-red-700">
+          {submitError}
+        </p>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="submit"
-          className="rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+          disabled={saving}
+          className="rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {submitLabel}
         </button>
