@@ -4,12 +4,18 @@ on:
   pull_request:
     paths:
       - "frontend/**"
+      - "backend/**"
+      - "compose.yaml"
+      - "Makefile"
       - ".github/workflows/ci-frontend.yml"
   push:
     branches:
       - main
     paths:
       - "frontend/**"
+      - "backend/**"
+      - "compose.yaml"
+      - "Makefile"
       - ".github/workflows/ci-frontend.yml"
 
 jobs:
@@ -69,8 +75,27 @@ jobs:
       - name: Instalar o navegador do Playwright
         run: npx playwright install --with-deps chromium
 
-      - name: Executar os testes E2E
-        run: npm run test:e2e
+      - name: Instalar o Poetry
+        run: pipx install poetry
+
+      - name: Configurar o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "poetry"
+          cache-dependency-path: backend/poetry.lock
+
+      - name: Instalar as dependencias do backend
+        working-directory: backend
+        run: poetry install --no-root
+
+      - name: Criar o arquivo .env
+        working-directory: .
+        run: cp .env.example .env
+
+      - name: Executar os testes E2E com a stack completa
+        working-directory: .
+        run: make e2e
 
       - name: Enviar o relatorio do Playwright
         if: failure()
